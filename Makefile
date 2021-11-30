@@ -5,7 +5,7 @@ DIR=/Users/tobiaslucero/Desktop/project4/
 
 all: project4
 
-project3: project3.cpp project4.h
+project4: project4.cpp project4.h
 	$(CC) project4.cpp $(INCL) -o project4.o
 
 clean:
@@ -15,7 +15,7 @@ run:
 	./project4.o $(DIR)p3.pcap
 
 A:
-	./project4.o $(DIR)p3.pcap $(DIR)input/1.txt $(DIR)input/A1.txt
+	./project4.o $(DIR)p3.pcap $(DIR)Project_Input/1.txt
 
 B:
 	./project4.o $(DIR)p3.pcap $(DIR)input/2.txt $(DIR)input/B2.txt 

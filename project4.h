@@ -22,7 +22,6 @@ static int total_no_hosts;
 static struct neighborInfo * neighbors;
 static struct routerTableEntry * router_table;
 
-static queue<unsigned char*>* neighbor_queues;
 static int* send_next;
 static clock_t* sent_time;
 static clock_t* ack_recv_time;
@@ -39,17 +38,17 @@ struct neighborInfo
     struct in_addr ip; 
 	  int port;
     int sender_port;
+    int cost;
+    int index;
 };
 
 struct routerTableEntry
 {
   char dst[15];
   char nxt_hop[15];
-};
-
-struct frame 
-{
-  unsigned char data[140];
+  int dst_index; // 1 = A, 2 = B, ..., 7=G
+  int cost;
+  int nxt_hop_index;
 };
 
 // This function takes two addresses and compares them
@@ -277,12 +276,13 @@ void* watchQueue(void* args)
     }
 }
 
-void parseFiles(FILE *configfile, FILE *switchfile) {
+void parseFiles(FILE *configfile) {
   // This will be our fake IP address
   int i = 0;
   char x;
 
 
+  // Get IP addr
   // Make sure the content is set to zero
   memset(my_ipaddr,0, 15);
   while(x != '\n') 
@@ -297,9 +297,9 @@ void parseFiles(FILE *configfile, FILE *switchfile) {
 
   fread(&x, 1, 1, configfile);
   
+  // Get port number
   x='a';
   i=0;
-
   while(x != '\n') 
   {
       fread(&x, 1, 1, configfile);
@@ -310,12 +310,31 @@ void parseFiles(FILE *configfile, FILE *switchfile) {
 
   fread(&x, 1, 1, configfile);
   memset(temp_string, 0, 6);
-  
+
+  // Get total number of hosts
   x='a';
-  i = 0;
+  i=0;
   while(x != '\n') 
   {
       fread(&x, 1, 1, configfile);
+
+      temp_string[i++] = x; 
+  }
+  temp_string[i-1] = 0;
+  total_no_hosts = atoi(temp_string);
+  total_no_hosts--; // Compensate because i am a host
+
+  fread(&x, 1, 1, configfile);
+  memset(temp_string, 0, 6);
+
+  // Get number of neighbors
+  x='a';
+  i = 0;
+
+  while(x != '\n') 
+  {
+      fread(&x, 1, 1, configfile);
+
       temp_string[i++] = x;
   }
 
@@ -325,11 +344,15 @@ void parseFiles(FILE *configfile, FILE *switchfile) {
 
   neighbors = (neighborInfo*) malloc(sizeof(neighborInfo) * number_of_neighbors );
 
+  router_table = (routerTableEntry*) malloc(sizeof(routerTableEntry) * total_no_hosts );
+
   unsigned long neighbor_addr;
 
+  neighborInfo n_info;
+
+  routerTableEntry entry;
   for(int k = 0; k < number_of_neighbors; ++k) 
   {
-      neighborInfo n_info;
     fread(&x, 1, 1, configfile);
   
     i=0;
@@ -339,6 +362,14 @@ void parseFiles(FILE *configfile, FILE *switchfile) {
       n_info.fakeIP[i++] = x; 
     }
     n_info.fakeIP[i-1] = 0;
+
+    temp_string[0] = n_info.fakeIP[i-2];
+    temp_string[1] = 0;
+
+    n_info.index=atoi(temp_string);
+
+    entry.dst_index=n_info.index-1;
+    entry.nxt_hop_index=n_info.index-1;
     
     strcpy(temp_string, "127.0.0.1");
 
@@ -353,7 +384,7 @@ void parseFiles(FILE *configfile, FILE *switchfile) {
       fread(&x, 1, 1, configfile);
   
     while(fread(&x, 1, 1, configfile) == 1) {
-      if(x == '\n') {
+      if(x == ' ') {
           break;
       }
       temp_string[i++] = x;
@@ -361,56 +392,38 @@ void parseFiles(FILE *configfile, FILE *switchfile) {
     temp_string[i] = 0;
     n_info.port = atoi(temp_string);
 
-    //printf("2%s %d %s\n", n_info.fakeIP, n_info.port, inet_ntoa(n_info.ip));
-    memcpy(&neighbors[k], &n_info, sizeof(neighborInfo));
-
-    //printf("1%s %d\n", neighbors[k].fakeIP, neighbors[k].port);
-  }
-
-  i = 0;
-  while(x != '\n') 
-  {
-      fread(&x, 1, 1, switchfile);
-      temp_string[i++] = x; 
-  }
-  temp_string[i-1] = 0;
-
-  total_no_hosts = atoi(temp_string);
-  total_no_hosts--; // Compensate?
-
-  router_table = (routerTableEntry*) malloc(sizeof(routerTableEntry) * total_no_hosts );
-
-  //routerTableEntry router_table_local[number_of_routes];
-
-  routerTableEntry entry; 
-      
-  fread(&x, 1, 1, switchfile);
-
-  for(int k = 0; k < total_no_hosts; ++k)
-  {
+    memset(temp_string,0, 6);
     i=0;
-    while(x != ' ') 
-    {
-        fread(&x, 1, 1, switchfile);
-        temp_string[i++] = x; 
-    }
-    temp_string[i-1] = 0;
 
-    strcpy(entry.dst, temp_string);
-
-    i = 0;
-    while(fread(&x, 1, 1, switchfile) == 1) {
+    while(fread(&x, 1, 1, configfile) == 1) {
       if(x == '\n') {
           break;
       }
       temp_string[i++] = x;
     }
     temp_string[i] = 0;
-    
-    strcpy(entry.nxt_hop, temp_string);
+    n_info.cost = atoi(temp_string);
+    entry.cost=n_info.cost;
 
-    memcpy(&router_table[k], &entry, sizeof(routerTableEntry));
+    //printf("2%s %d %s\n", n_info.fakeIP, n_info.port, inet_ntoa(n_info.ip));
+    memcpy(&neighbors[k], &n_info, sizeof(neighborInfo));
+    memcpy(&router_table[entry.dst_index], &entry, sizeof(routerTableEntry));
 
+    //printf("1%s %d\n", neighbors[k].fakeIP, neighbors[k].port);
   }
+
+
+
+  for(int k = 0; k < total_no_hosts; ++k) {
+    if(router_table[k].dst_index==0) {
+      router_table[k].dst_index = k;
+      router_table[k].nxt_hop_index=-1;
+      router_table[k].cost=-1;
+    }
+
+    printf("k: %d %d %d %d\n",k,router_table[k].dst_index,router_table[k].nxt_hop_index,
+      router_table[k].cost);
+  }
+
   
 }
