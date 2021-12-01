@@ -24,15 +24,7 @@ static struct routerTableEntry * router_table;
 
 static int my_index;
 
-static int* send_next;
-static clock_t* sent_time;
-static clock_t* ack_recv_time;
-static int* send_ack;
-static int* acked;
-
-static queue<int>* neighbor_queues_message_length;
-
-static queue<unsigned char*>* frames;
+static int router_table_size;
 
 struct neighborInfo
 {
@@ -46,8 +38,6 @@ struct neighborInfo
 
 struct routerTableEntry
 {
-  char dst[15];
-  char nxt_hop[15];
   int dst_index; // 1 = A, 2 = B, ..., 7=G
   int cost;
   int nxt_hop_index;
@@ -69,33 +59,13 @@ int compareAddresses(char * addr1, char * addr2) {
   return 1;
 }
 
-// This function takes an ip address and returns the index
-// of the neighbor in global neighbor array that is the next hop
-int route(char * addr) {
-  printf("Routing %s by fake addr\n", addr);
-  int index = -1;
-  for(int i = 0; i < total_no_hosts; ++i) {
-    //printf("%d: %s %s\n", i, entry.dst, entry.nxt_hop);
-    //printf("i: %d %s %s", i, router_table[i].dst, addr);
-    if(compareAddresses(router_table[i].dst, addr) == 1) {
-      //return router_table[i].nxt_hop;
-      //printf("i: %d\n", i);
-      index = i;
-    }
-  }
 
-  if(index == -1) return -1;
-
+char * getAddrByIndexOnRouterTable(int index) {
   for(int i = 0; i < number_of_neighbors; ++i) {
-    //printf("j: %d %s %s\n", i, router_table[index].nxt_hop, neighbors[i].fakeIP);
-    if(compareAddresses(neighbors[i].fakeIP, router_table[index].nxt_hop))
-    {
-     // printf("Returning %d\n", i);
-      return i;
+    if(neighbors[i].index==index) {
+      return neighbors[i].fakeIP;
     }
   }
-
-  return -1;
 }
 
 int routeBySenderPortNum(int port) {
@@ -106,7 +76,7 @@ int routeBySenderPortNum(int port) {
     if(neighbors[i].sender_port == port)
     {
       //printf("Returning %d\n", i);
-      return i;
+      return neighbors[i].index;
     }
   }
 
@@ -262,28 +232,22 @@ void printFrame(unsigned char buf[])
     printf("\n");   
 }
 
-// This function will be executed by the thread which will watch the queue
-void* watchQueue(void* args)
-{
-    // Loop forever
-    while(true){
-        // If the queue is not empty print the frame at the front and pop
-        if(!((*frames).empty()))
-        {
-            printFrame((*frames).front());
-            printf("Freeing\n");
-            free((*frames).front());
-            (*frames).pop();
-        }
-    }
-}
-
 // Prints the routing table
-void printRoutingTable() {
+void printRoutingTable(routerTableEntry * rtr_table) {
   printf("Destination_Index|Next_Hop_Index|Cost\n");
   for(int i = 0; i < total_no_hosts; ++i) {
-    printf("%d|%d|%d\n",router_table[i].dst_index,router_table[i].nxt_hop_index,router_table[i].cost);
+    printf("%d|%d|%d\n",rtr_table[i].dst_index,rtr_table[i].nxt_hop_index,rtr_table[i].cost);
   }
+  printf("\n");
+}
+
+void printNeighborTable() {
+  printf("FakeIP|Rcvr_Port|Sndr_Port|Cost|Index_on_routing_table\n");
+  for(int i = 0; i < number_of_neighbors; ++i) {
+    printf("%s|%d|%d|%d|%d\n",neighbors[i].fakeIP,neighbors[i].port,
+      neighbors[i].sender_port,neighbors[i].cost,neighbors[i].index);
+  }
+  printf("\n");
 }
 
 void parseFiles(FILE *configfile) {
@@ -361,6 +325,12 @@ void parseFiles(FILE *configfile) {
   neighbors = (neighborInfo*) malloc(sizeof(neighborInfo) * number_of_neighbors );
 
   router_table = (routerTableEntry*) malloc(sizeof(routerTableEntry) * total_no_hosts );
+
+
+  router_table_size = sizeof(routerTableEntry)*total_no_hosts;
+
+
+  memset(router_table, 0, router_table_size);
 
   unsigned long neighbor_addr;
 
@@ -443,6 +413,7 @@ void parseFiles(FILE *configfile) {
       router_table[k].cost=0;
     }
   }
-  printRoutingTable();
+  printRoutingTable(router_table);
+  //printNeighborTable();
   
 }
