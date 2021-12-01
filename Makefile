@@ -1,7 +1,7 @@
 CC=g++
 INCL=-lpcap -lpthread
-##DIR=/home/tlucero/Data_Networks_Projects/Project4/
-DIR=/Users/tobiaslucero/Desktop/project4/
+DIR=/home/tlucero/Data_Networks_Projects/Project4/
+##DIR=/Users/tobiaslucero/Desktop/project4/
 
 all: project4
 
@@ -18,13 +18,13 @@ A:
 	./project4.o $(DIR)p3.pcap $(DIR)Project_Input/1.txt
 
 B:
-	./project4.o $(DIR)p3.pcap $(DIR)input/2.txt $(DIR)input/B2.txt 
+	./project4.o $(DIR)p3.pcap $(DIR)Project_Input/2.txt 
 
 C:
-	./project4.o $(DIR)p3.pcap $(DIR)input/3.txt $(DIR)input/C3.txt
+	./project4.o $(DIR)p3.pcap $(DIR)Project_Input/3.txt 
 
 D:
-	./project4.o $(DIR)p3.pcap $(DIR)input/4.txt $(DIR)input/D4.txt
+	./project4.o $(DIR)p3.pcap $(DIR)Project_Input/4.txt 
 
 zip:
 	zip project4.zip *.cpp Makefile	

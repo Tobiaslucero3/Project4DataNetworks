@@ -22,6 +22,8 @@ static int total_no_hosts;
 static struct neighborInfo * neighbors;
 static struct routerTableEntry * router_table;
 
+static int my_index;
+
 static int* send_next;
 static clock_t* sent_time;
 static clock_t* ack_recv_time;
@@ -276,10 +278,22 @@ void* watchQueue(void* args)
     }
 }
 
+// Prints the routing table
+void printRoutingTable() {
+  printf("Destination_Index|Next_Hop_Index|Cost\n");
+  for(int i = 0; i < total_no_hosts; ++i) {
+    printf("%d|%d|%d\n",router_table[i].dst_index,router_table[i].nxt_hop_index,router_table[i].cost);
+  }
+}
+
 void parseFiles(FILE *configfile) {
+  
   // This will be our fake IP address
   int i = 0;
   char x;
+
+    // This will be used to copy things from the file
+  char temp_string[15];
 
 
   // Get IP addr
@@ -292,8 +306,10 @@ void parseFiles(FILE *configfile) {
   }
   my_ipaddr[i-1] = 0;
 
-  // This will be used to copy things from the file
-  char temp_string[15];
+  temp_string[0] = my_ipaddr[i-2];
+  temp_string[1] = 0;
+  my_index=atoi(temp_string);
+  my_index--; // Compensate because array 0 indexed vs IP start at 1
 
   fread(&x, 1, 1, configfile);
   
@@ -322,7 +338,7 @@ void parseFiles(FILE *configfile) {
   }
   temp_string[i-1] = 0;
   total_no_hosts = atoi(temp_string);
-  total_no_hosts--; // Compensate because i am a host
+  //total_no_hosts--; // Compensate because i am a host
 
   fread(&x, 1, 1, configfile);
   memset(temp_string, 0, 6);
@@ -367,9 +383,10 @@ void parseFiles(FILE *configfile) {
     temp_string[1] = 0;
 
     n_info.index=atoi(temp_string);
+    n_info.index--; // Compensate because array 0 indexed vs IP start at 1
 
-    entry.dst_index=n_info.index-1;
-    entry.nxt_hop_index=n_info.index-1;
+    entry.dst_index=n_info.index;
+    entry.nxt_hop_index=n_info.index;
     
     strcpy(temp_string, "127.0.0.1");
 
@@ -405,7 +422,7 @@ void parseFiles(FILE *configfile) {
     n_info.cost = atoi(temp_string);
     entry.cost=n_info.cost;
 
-    //printf("2%s %d %s\n", n_info.fakeIP, n_info.port, inet_ntoa(n_info.ip));
+    printf("%s %d %d and %d\n", n_info.fakeIP, n_info.port, n_info.cost, entry.dst_index);
     memcpy(&neighbors[k], &n_info, sizeof(neighborInfo));
     memcpy(&router_table[entry.dst_index], &entry, sizeof(routerTableEntry));
 
@@ -415,15 +432,17 @@ void parseFiles(FILE *configfile) {
 
 
   for(int k = 0; k < total_no_hosts; ++k) {
-    if(router_table[k].dst_index==0) {
+    if(router_table[k].cost==0) {
       router_table[k].dst_index = k;
       router_table[k].nxt_hop_index=-1;
       router_table[k].cost=-1;
     }
-
-    printf("k: %d %d %d %d\n",k,router_table[k].dst_index,router_table[k].nxt_hop_index,
-      router_table[k].cost);
+    if(k==my_index) {
+      router_table[k].dst_index = k;
+      router_table[k].nxt_hop_index=k;
+      router_table[k].cost=0;
+    }
   }
-
+  printRoutingTable();
   
 }

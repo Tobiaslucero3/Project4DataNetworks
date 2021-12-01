@@ -31,6 +31,7 @@ int main(int argc, char** argv)
   free(router_table);
 
   return 0;
+}
 
   /** PREPARING GLOBAL VARIABLES *//* *
   queue<unsigned char*> frames_local;
@@ -133,5 +134,5 @@ int main(int argc, char** argv)
 
 
   return 0;*/
-}
+
 
