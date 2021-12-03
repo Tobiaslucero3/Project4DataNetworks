@@ -1,7 +1,7 @@
 CC=g++
 INCL=-lpcap -lpthread
-##DIR=/home/tlucero/Data_Networks_Projects/Project4/input/
-DIR=/Users/tobiaslucero/Desktop/project4/input/
+DIR=/home/tlucero/Data_Networks_Projects/Project4/input/
+##DIR=/Users/tobiaslucero/Desktop/project4/input/
 
 all: project4
 

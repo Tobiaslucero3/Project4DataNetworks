@@ -32,16 +32,13 @@ void* sender(void* args) {
       }
   }
 
-  printf("%d\n", router_table_size);
-
-  unsigned char buf[router_table_size+5];
-
-  while(true) 
+  int times_needed = total_no_hosts;
+  while(times_needed!=0) 
   {
     // Loop over all neighbors and see if they need a packet or acknowledgement sent
     for(int i = 0; i < number_of_neighbors; ++i) 
     {
-      sleep(1);
+      sleep(3);
       
       if (sendto(sockets[i], router_table, router_table_size, 0, (struct sockaddr *)&servers[i],server_address_size) < 0)
       {
@@ -49,7 +46,10 @@ void* sender(void* args) {
         exit(2);
       }
     }
+    times_needed--;
   }
+
+  printf("Finished sending\n");
 
   for(int i = 0; i < number_of_neighbors; ++i) {
     close(sockets[i]);
@@ -138,7 +138,8 @@ void* receiver(void* args) {
   int len = -1;
   int neighbor_index;
 
-  while (true) { 
+  int times_needed = total_no_hosts+2;
+  while (times_needed!=0) { 
     
     buf[0] = '\0';
     // Receive from the client
@@ -155,11 +156,13 @@ void* receiver(void* args) {
     }
     
     printf("Received msg len=%d sender port %d which is addr %s\n", len,
-      ntohs(client.sin_port),getAddrByIndexOnRouterTable(neighbor_index));
+      ntohs(client.sin_port),router_table[neighbor_index].fakeIP);
 
 
     printf("my routing table b4 update\n");
     printRoutingTable(router_table);
+
+    sleep(1);
 
     int costToNeighbor = router_table[neighbor_index].cost;
     int costFromNeighborToNext, currentCostToNext, sumCost;
@@ -172,10 +175,7 @@ void* receiver(void* args) {
         
         sumCost = costToNeighbor + costFromNeighborToNext;
 
-        if((currentCostToNext==-1)&&(costFromNeighborToNext!=-1)) {
-          router_table[i].cost = sumCost;
-          router_table[i].nxt_hop_index = neighbor_index;
-        } else if((currentCostToNext!=-1)&&(sumCost < currentCostToNext)) {
+        if( ((currentCostToNext==-1)&&(costFromNeighborToNext!=-1)) || ((currentCostToNext!=-1)&&(sumCost < currentCostToNext)) ) {
           router_table[i].cost = sumCost;
           router_table[i].nxt_hop_index = neighbor_index;
         }
@@ -187,7 +187,12 @@ void* receiver(void* args) {
 
     printf("my routing table after update\n");
     printRoutingTable(router_table);
+
+    times_needed--;
   }
+
+  printf("Finished recvng\n");
+
 }
 
 /** I used pcap.h to parse through the pcap file */
@@ -315,6 +320,83 @@ int main(int argc, char** argv)
 
   printNeighborTable();
   printRoutingTable(router_table);
+
+
+
+  /** OPENING OUTPUT CONFIG/SWITCH FILE */
+  char temp[30];
+  char x[2];
+  x[0]='\n';
+  x[1]='\n';
+  sprintf(temp, "output/%d.txt", my_index+1);
+
+  FILE *outputConfigfile;
+  outputConfigfile = fopen(temp, "w");
+  if (outputConfigfile == NULL) 
+  { 
+      fprintf(stderr, "\nError opening config file\n"); 
+      exit(1); 
+  } 
+
+  fwrite(my_ipaddr, 1, strlen(my_ipaddr), outputConfigfile);
+  fwrite(x, 1, 2, outputConfigfile);
+  sprintf(temp, "%d\n\n", my_port);
+  fwrite(temp, 1, strlen(temp), outputConfigfile);
+  int final_num_neighbors = 0;
+  for(int i = 0; i < total_no_hosts; ++i) {
+    if((i!=my_index)&&(router_table[i].dst_index==router_table[i].nxt_hop_index)) {
+      final_num_neighbors++;
+    }
+  }
+  sprintf(temp, "%d\n\n", final_num_neighbors);
+  fwrite(temp, 1, strlen(temp), outputConfigfile);
+  int neighbor_index;
+  for(int i = 0; i < total_no_hosts; ++i) {
+    if((i!=my_index)&&(router_table[i].dst_index==router_table[i].nxt_hop_index)) {
+      neighbor_index=getIndexOnNeighborTableFromIndexOnRouterTable(i);
+
+      sprintf(temp, "%s %s %d", neighbors[neighbor_index].fakeIP, inet_ntoa(neighbors[neighbor_index].ip), neighbors[neighbor_index].port);
+      fwrite(temp, 1, strlen(temp), outputConfigfile);
+
+      final_num_neighbors--;
+
+      if(final_num_neighbors>0) {
+        sprintf(temp, "\n\n");
+        fwrite(temp, 1, strlen(temp), outputConfigfile);
+      } else {
+        break;
+      }
+      
+    }
+  }
+  
+  char letter = 65 + my_index;
+  sprintf(temp, "output/%c%d.txt", letter, my_index+1);
+
+  FILE *outputSwitchfile;
+  outputSwitchfile = fopen(temp, "w");
+  if (outputSwitchfile == NULL) 
+  { 
+      fprintf(stderr, "\nError opening switch file\n"); 
+      exit(1); 
+  }  
+
+  sprintf(temp, "%d\n\n",total_no_hosts);
+  fwrite(temp, 1, strlen(temp), outputSwitchfile);
+
+  for(int i = 0 ; i < total_no_hosts; ++i) {
+    if(i!=my_index) {
+      sprintf(temp, "%s %s", router_table[i].fakeIP, router_table[router_table[i].nxt_hop_index].fakeIP);
+      fwrite(temp, 1, strlen(temp), outputSwitchfile);
+      if(i < total_no_hosts-1) {
+        sprintf(temp, "\n");
+        fwrite(temp, 1, strlen(temp), outputSwitchfile);
+      }
+    }
+  }
+
+  fclose(outputConfigfile);
+  fclose(outputSwitchfile);
 
   free(neighbors);
   free(router_table);

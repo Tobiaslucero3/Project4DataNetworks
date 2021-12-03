@@ -12,6 +12,7 @@
 #include <string.h>
 #include <time.h>
 #include <queue>
+#include <iostream>
 
 using namespace std;
 
@@ -38,6 +39,7 @@ struct neighborInfo
 
 struct routerTableEntry
 {
+  char fakeIP[15];
   int dst_index; // 1 = A, 2 = B, ..., 7=G
   int cost;
   int nxt_hop_index;
@@ -59,13 +61,13 @@ int compareAddresses(char * addr1, char * addr2) {
   return 1;
 }
 
-
-char * getAddrByIndexOnRouterTable(int index) {
-  for(int i = 0; i < number_of_neighbors; ++i) {
+int getIndexOnNeighborTableFromIndexOnRouterTable(int index) {
+    for(int i = 0; i < number_of_neighbors; ++i) {
     if(neighbors[i].index==index) {
-      return neighbors[i].fakeIP;
+      return i;
     }
   }
+  return -1;
 }
 
 int routeBySenderPortNum(int port) {
@@ -349,6 +351,8 @@ void parseFiles(FILE *configfile) {
     }
     n_info.fakeIP[i-1] = 0;
 
+    strcpy(entry.fakeIP, n_info.fakeIP);
+
     temp_string[0] = n_info.fakeIP[i-2];
     temp_string[1] = 0;
 
@@ -399,19 +403,21 @@ void parseFiles(FILE *configfile) {
     //printf("1%s %d\n", neighbors[k].fakeIP, neighbors[k].port);
   }
 
-
+  
 
   for(int k = 0; k < total_no_hosts; ++k) {
     if(router_table[k].cost==0) {
       router_table[k].dst_index = k;
       router_table[k].nxt_hop_index=-1;
-      router_table[k].cost=-1;
+      router_table[k].cost=-1; 
     }
     if(k==my_index) {
       router_table[k].dst_index = k;
       router_table[k].nxt_hop_index=k;
       router_table[k].cost=0;
     }
+    sprintf(temp_string, "10.0.0.%d", k+1);
+    strcpy(router_table[k].fakeIP, temp_string);
   }
   printRoutingTable(router_table);
   //printNeighborTable();
