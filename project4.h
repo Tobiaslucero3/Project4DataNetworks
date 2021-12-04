@@ -23,6 +23,8 @@ static int total_no_hosts;
 static struct neighborInfo * neighbors;
 static struct routerTableEntry * router_table;
 
+static int times_needed;
+
 static int my_index;
 
 static int router_table_size;
@@ -331,6 +333,7 @@ void parseFiles(FILE *configfile) {
 
   router_table_size = sizeof(routerTableEntry)*total_no_hosts;
 
+  times_needed = total_no_hosts + 2;
 
   memset(router_table, 0, router_table_size);
 

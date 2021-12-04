@@ -27,4 +27,4 @@ D:
 	./project4.o $(DIR)p3.pcap $(DIR)4.txt 
 
 zip:
-	zip project4.zip *.cpp Makefile	
+	zip project4.zip *.cpp *.h Makefile	
